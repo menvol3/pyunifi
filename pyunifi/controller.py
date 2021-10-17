@@ -10,7 +10,6 @@ import logging
 import requests
 from urllib3.exceptions import InsecureRequestWarning
 
-
 """For testing purposes:
 logging.basicConfig(filename='pyunifi.log', level=logging.WARN,
                     format='%(asctime)s %(message)s')
@@ -47,13 +46,7 @@ class Controller:  # pylint: disable=R0902,R0904
     Uses the JSON interface on port 8443 (HTTPS) to communicate with a UniFi
     controller. Operations will raise unifi.controller.APIError on obvious
     problems (such as login failure), but many errors (such as disconnecting a
-    nonexistant client) will go unreported.
-
-    >>> from unifi.controller import Controller
-    >>> c = Controller('192.168.1.99', 'admin', 'p4ssw0rd')
-    >>> for ap in c.get_aps():
-    ...     print 'AP named %s with MAC %s' % (ap.get('name'), ap['mac'])
-    ...
+    nonexistent client) will go unreported.
     AP named Study with MAC dc:9f:db:1a:59:07
     AP named Living Room with MAC dc:9f:db:1a:59:08
     AP named Garage with MAC dc:9f:db:1a:59:0b
@@ -194,7 +187,7 @@ class Controller:  # pylint: disable=R0902,R0904
         if response.status_code != 200:
             raise APIError(
                 "Login failed - status code: %i" % response.status_code
-                )
+            )
 
     def _logout(self):
         self.log.debug("logout()")
@@ -213,7 +206,7 @@ class Controller:  # pylint: disable=R0902,R0904
         if self.version == "UDMP-unifiOS":
             raise APIError(
                 "Controller version not supported: %s" % self.version
-                )
+            )
 
         for site in self.get_sites():
             if site["desc"] == name:
@@ -312,6 +305,14 @@ class Controller:  # pylint: disable=R0902,R0904
         params["mac"] = target_mac
         return self._run_command(command, params, mgr)
 
+    def _mac_port_cmd(self, target_mac, port_idx, command, mgr="stamgr", params=None):
+        if params is None:
+            params = {}
+        self.log.debug("_mac_cmd(%s, %s)", target_mac, command)
+        params["mac"] = target_mac
+        params["port_idx"] = port_idx
+        return self._run_command(command, params, mgr)
+
     def get_device_stat(self, target_mac):
         """Gets the current state & configuration of
         the given device based on its MAC Address.
@@ -324,6 +325,31 @@ class Controller:  # pylint: disable=R0902,R0904
         self.log.debug("get_device_stat(%s)", target_mac)
         params = {"macs": [target_mac]}
         return self._api_read("stat/device/" + target_mac, params)[0]
+
+    def get_devices(self):
+        """Gets the current state & configuration of
+        the given device based on its MAC Address.
+        :param target_mac: MAC address of the device.
+        :type target_mac: str
+        :returns: Dictionary containing metadata, state,
+            capabilities and configuration of the device
+        :rtype: dict()
+        """
+        self.log.debug("get_device_stat(%s)")
+        return self._api_read("stat/device/")
+
+    def power_cycle_switch_port(self, mac, port_idx):
+        """
+        Upgrade a device's firmware to version
+        :param mac: MAC of dev
+        :param port_idx: Port ID to target
+        :type port_idx: int
+        """
+        self._mac_port_cmd(
+            mac, port_idx,
+            "power-cycle",
+            mgr="devmgr"
+        )
 
     def get_radius_users(self):
         """Return a list of all users, with their
@@ -392,7 +418,7 @@ class Controller:  # pylint: disable=R0902,R0904
         # different Class, Switch.
         self.log.debug(
             "_switch_port_power(%s, %s, %s)", target_mac, port_idx, mode
-            )
+        )
         device_stat = self.get_device_stat(target_mac)
         device_id = device_stat.get("_id")
         overrides = device_stat.get("port_overrides")
@@ -414,13 +440,13 @@ class Controller:  # pylint: disable=R0902,R0904
             if portconf_id is None:
                 raise APIError(
                     "Port ID %s not found in port_table" % str(port_idx)
-                    )
+                )
             overrides.append(
                 {
                     "port_idx": port_idx,
                     "portconf_id": portconf_id,
                     "poe_mode": mode
-                    }
+                }
             )
         # We return the device_id as it's needed by the parent method
         return {"port_overrides": overrides, "device_id": device_id}
@@ -469,13 +495,13 @@ class Controller:  # pylint: disable=R0902,R0904
         if self.version == "UDMP-unifiOS":
             raise APIError(
                 "Controller version not supported: %s" % self.version
-                )
+            )
 
         return self._run_command(
             "add-site",
             params={"desc": desc},
             mgr="sitemgr"
-            )
+        )
 
     def block_client(self, mac):
         """Add a client to the block list.
@@ -542,13 +568,13 @@ class Controller:  # pylint: disable=R0902,R0904
         if self.version == "UDMP-unifiOS":
             raise APIError(
                 "Controller version not supported: %s" % self.version
-                )
+            )
 
         res = self._run_command(
             "backup",
             mgr="system",
             params={"days": days}
-            )
+        )
         return res[0]["url"]
 
     # TODO: Not currently supported on UDMP as it now utilizes async-backups.
@@ -562,7 +588,7 @@ class Controller:  # pylint: disable=R0902,R0904
         if self.version == "UDMP-unifiOS":
             raise APIError(
                 "Controller version not supported: %s" % self.version
-                )
+            )
 
         if not download_path:
             download_path = self.create_backup()
@@ -618,7 +644,7 @@ class Controller:  # pylint: disable=R0902,R0904
         return self._run_command(
             cmd,
             params=params
-            )
+        )
 
     def get_firmware(
             self,
@@ -666,7 +692,7 @@ class Controller:  # pylint: disable=R0902,R0904
             params={
                 "device": device,
                 "version": version
-                }
+            }
         )[0]["result"]
 
     def remove_firmware(self, version, device):
@@ -686,7 +712,7 @@ class Controller:  # pylint: disable=R0902,R0904
             params={
                 "device": device,
                 "version": version
-                }
+            }
         )[0]["result"]
 
     def get_tag(self):
@@ -705,7 +731,7 @@ class Controller:  # pylint: disable=R0902,R0904
             mgr="devmgr",
             params={
                 "upgrade_to_firmware": version
-                }
+            }
         )
 
     def provision(self, mac):
